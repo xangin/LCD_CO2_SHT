@@ -1,0 +1,240 @@
+esphome:
+  name: lcd-co2-sht-str
+  
+esp8266:
+  board: d1_mini
+
+      
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ota:
+  #password: !secret ota_password
+  
+wifi:
+  ssid: !secret my_ap_ssid
+  password: !secret my_ap_password
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "lcd-co2-aht-str"
+    password: "12345678"
+
+captive_portal:
+
+
+uart:
+  rx_pin: D2   #to S8 TXD
+  tx_pin: D1   #to S8 RXD
+  baud_rate: 9600
+
+
+spi:
+  clk_pin: D5
+  mosi_pin: D7
+
+i2c:
+  sda: D3
+  scl: D4
+  scan: true
+
+sensor:
+  - platform: senseair  
+    id: s8_air
+    co2:
+      name: "CO2 Value"
+      id: co2_data
+    update_interval: 30s
+      
+  - platform: wifi_signal
+    id: wifisignal
+    name: "WiFi Signal Sensor"
+    update_interval: 60s
+    
+  - platform: sht3xd
+    temperature:
+      name: "Temperature"
+      id: temp_data
+    humidity:
+      name: "Humidity"
+      id: hum_data
+    address: 0x44  
+    update_interval: 30s
+    
+switch:
+  - platform: gpio
+    name: "LCD light"
+    pin: D8
+    restore_mode: RESTORE_DEFAULT_ON
+    id: d3_switch
+
+# text_sensor:
+#   - platform: homeassistant
+#     id: current_time   
+#     entity_id: sensor.time  
+
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: Asia/Taipei
+
+binary_sensor:
+  - platform: status
+    name: "Status"
+    id: system_status
+    
+font:
+  - file: "fonts/TT0246M.ttf"
+    id: data_font
+    size: 19
+    glyphs:    
+      ['!', ',', '.', '"', '%', '-', '_', ':', '°', '/',
+       '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ' ',
+       'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
+       'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 
+       'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g',
+       'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r',
+       's', 't', 'u', 'v', 'w', 'x', 'y', 'z']
+    
+  - file: "fonts/Roboto-Medium.ttf"
+    id: time_font
+    size: 35
+    glyphs: [0, 1, 2, 3, 4, 5, 6, 7 ,8, 9, ':']
+    
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: icon_font
+    size: 25
+    glyphs: 
+      - "\U000F058E" # mdi-water-percent
+      - "\U000F050F" # mdi-thermometer
+      - "\U000F07E4" # mdi-molecule-co2
+      - "\U000F0783" # mdi-signal-off
+      - "\U000F08BF" # mdi-signal-cellular-outline bad
+      - "\U000F08BC" # mdi-signal-cellular-1
+      - "\U000F08BD" # mdi-signal-cellular-2
+      - "\U000F08BE" # mdi-signal-cellular-3 good
+
+color:
+  - id: my_red
+    red: 100%
+    green: 0%
+    blue: 0%
+    
+  - id: my_yellow
+    red: 100%
+    green: 100%
+    blue: 0%
+    
+  - id: my_green
+    red: 0%
+    green: 60%
+    blue: 0%
+    
+  - id: time_color
+    red: 0%
+    green: 70%
+    blue: 70%    
+    
+  - id: my_blue
+    red: 0%
+    green: 0%
+    blue: 100%
+
+
+    
+display:
+  - platform: st7735
+    model: "INITR_BLACKTAB"
+    cs_pin: D0
+    dc_pin: D6
+    rotation: 180
+    device_width: 130
+    device_height: 162
+    col_start: 0
+    row_start: 0
+    eight_bit_color: true
+    update_interval: 5s
+    lambda: |-
+      int x,y,icon_start=5,text_start=32;
+
+      //Draw a rectangle from the top left at [50,60], a width of 30 and a height of 42
+      //frame
+      it.rectangle(2, 1, 126, 40,id(time_color));
+      it.rectangle(2, 1, 126, 160,id(time_color));
+      it.line(127, 1, 127, 161,id(time_color));
+      
+        //time
+        it.strftime(7,1, id(time_font),id(time_color), "%H:%M", id(sntp_time).now());
+        //it.printf(7,1, id(time_font),id(time_color), "%s", id(current_time).state.c_str());
+        
+        /* WiFi Signal Strengh */
+        x = 100, y = 15;
+        if (id(wifisignal).state >= -50) {
+            //Excellent
+            it.print(x, y, id(icon_font),id(my_green), "\U000F08BE");
+        } else if (id(wifisignal).state  >= -60) {
+            //Good
+            it.print(x, y, id(icon_font),id(my_green), "\U000F08BD");
+        } else if (id(wifisignal).state  >= -67) {
+            //Fair
+            it.print(x, y, id(icon_font),id(my_green),"\U000F08BC");
+        } else if (id(wifisignal).state  >= -70) {
+            //Weak
+            it.print(x, y, id(icon_font),id(my_green),"\U000F08BF");
+        } else {
+            //Unlikely working signal
+            it.print(x, y, id(icon_font),id(my_red),"\U000F0783");
+        }
+      
+      
+      if(id(co2_data).has_state() && id(temp_data).has_state() && id(hum_data).has_state()) {
+      
+        //temperature
+        y=50;
+        it.print(icon_start, y, id(icon_font),id(time_color), "\U000F050F"); //icon
+
+        if (id(temp_data).state < 25) {
+          it.printf(text_start,y, id(data_font),id(my_green), "%.1f°C", id(temp_data).state);
+        }
+        else if (id(temp_data).state < 30)  {
+          it.printf(text_start,y, id(data_font),id(my_yellow), "%.1f°C", id(temp_data).state);
+        }
+        else {
+          it.printf(text_start,y, id(data_font),id(my_red), "%.1f°C", id(temp_data).state);
+        }
+        
+        //humidity
+        y=90;
+        it.print(icon_start, y, id(icon_font),id(time_color), "\U000F058E"); //icon
+        
+        if (id(hum_data).state < 45) {
+          it.printf(text_start,y, id(data_font),id(my_green),"%.1f%%", id(hum_data).state);
+        }
+        else if (id(hum_data).state < 65)  {
+          it.printf(text_start,y, id(data_font),id(my_yellow),"%.1f%%", id(hum_data).state);
+        }
+        else {
+          it.printf(text_start,y, id(data_font),id(my_red), "%.1f%%", id(hum_data).state);
+        } 
+      
+        //CO2
+        y=130;
+        it.print(icon_start, y, id(icon_font),id(time_color), "\U000F07E4"); //icon
+      
+        if (id(co2_data).state < 700) {
+          it.printf(text_start,y, id(data_font),id(my_green), "%dppm", (int) id(co2_data).state);
+        }
+        else if (id(co2_data).state < 1000)  {
+          it.printf(text_start,y, id(data_font),id(my_yellow), "%dppm", (int) id(co2_data).state);
+        }
+        else {
+          it.printf(text_start,y, id(data_font),id(my_red), "%dppm", (int) id(co2_data).state);
+        } 
+      
+      }else{
+        it.printf(30,55, id(data_font),id(time_color),"Loading");
+        it.printf(35,90, id(data_font),id(time_color),"Please");
+        it.printf(35,125, id(data_font),id(time_color),"wait...");
+      }
